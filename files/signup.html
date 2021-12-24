@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>accounts.aimedtuba.com</title>
+    <style>
+        .main{
+            overflow:auto;
+            width:30vw;
+            min-width:40vh;
+            height:80vh;
+            border:2px solid lightgray;
+            border-radius: 15px;
+            top:50%;
+            left:50%;
+            position:absolute;
+            transform:translate(-50%,-50%);
+        }
+        .line{
+            width:14vw;
+            min-width:19vh;
+            height:1px;
+            border:1px solid transparent;
+            border-radius: 50px;
+            background-color:lightgray;
+        }
+        input, button, select,textarea{
+            outline: none; 
+            border:2px lightgray solid; 
+            border-radius:5px;
+            color:lightgray;
+            font-size: 15px;
+            background-color: white;
+            resize: none;
+        }
+        button{cursor: pointer;}
+        input{height: 20px;}
+        h2,a{font-family: 'Arial';}
+        input::placeholder,textarea::placeholder{color:lightgray;}
+        .code{height:72px;width:225px;}
+        *:disabled{cursor:not-allowed;}
+        .content-1,.content-2{margin-left:1vw;}
+        .hidden{display: none;}
+        .placeholder-red::placeholder{color:red;}
+        .hovertext:hover::after {
+            content: " Must be 12-24 characters, including a number and a sepcial character  ";
+            font-size: 12px;
+            color: lightgray;
+            border: 2px solid lightgray;
+            border-radius: 5px;
+            text-overflow: ellipsis;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main">
+        <hr class="line">
+        <div class="content-1"><br>
+            <textarea type="text" class="code" placeholder=" Code"></textarea><br>
+            <input type="text" class="username" placeholder=" Username"><br><br>
+            <button class="try">Submit</button><br>
+        </div>
+        <div class="content-2 hidden">
+            <h2>Username, code</h2>
+            <input type="text" class="code-2" disabled><br>
+            <input type="username" class="username-2" disabled>
+            <h2>Passcode <a class="hovertext">?</a></h2>
+            <input type="password" class="passcode" placeholder=" Passcode"><br>
+            <input type="password" class="passcode-verify" placeholder=" Verify Passcode">
+            <h2>2FA</h2>
+            <select class="twofa-type">
+                <option value="-1" selected disabled>2FA meathod</option>
+                <option value="0">Personal Question</option>
+                <option value="1">⭐️ Email</option>
+            </select><br class="twofa-type-br">
+            <input type="email" class="twofa-email hidden" placeholder=" Email">
+            <select class="twofa-question hidden">
+                <option value="-1" selected disabled>Personal question</option>
+                <option value="0">What is your dad's middle name?</option>
+                <option value="1">What is your grandmother's name?</option>
+                <option value="2">What is the name of your first pet?</option>
+                <option value="3">What is the name of your first teacher?</option>
+                <option value="4">Where were you born?</option>
+            </select><br>
+            <input type="text" class="twofa-answer hidden" placeholder=" Answer">
+            <h2>Submit</h2>
+            <button class="create">Submit</button><br>
+            <a style="color:red" class="error-text"></a>
+        </div>
+    </div>
+    <script>
+        if(new URLSearchParams(location.search).get('code')){
+            document.querySelector('.code').value = new URLSearchParams(location.search).get('code');
+        }else if(getCookie('code')){
+            document.querySelector('.code').value = getCookie('code');
+        }
+        document.querySelector('.create').onclick = ()=>{
+            if(
+                document.querySelector('.passcode').value == document.querySelector('.passcode-verify').value &&
+                validate_passcode(document.querySelector('.passcode').value) &&
+                document.querySelector('.passcode-verify') != "" &&
+                document.querySelector('.passcode').value != "" &&
+                (
+                    document.querySelector('.twofa-answer').value != "" ||
+                    (
+                        document.querySelector('.twofa-email').value != "" &&
+                        validate_email(document.querySelector('.twofa-email').value)
+                    )
+                )
+            ){
+                let data={
+                    code:document.querySelector('.code').value,
+                    username:document.querySelector('.username').value,
+                    passcode:document.querySelector('.passcode').value,
+                    twofa:document.querySelector('.twofa-type').value=="0"?document.querySelector('.twofa-question').value:document.querySelector('.twofa-email').value,
+                }
+                if(document.querySelector('.twofa-type').value=="0"){
+                    data.twofanswer=document.querySelector('.twofa-answer').value;
+                }
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/accounts/new/first', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify(data));
+                xhr.onreadystatechange = function() {
+                    if (this.readyState == 4) {
+                        if((!(this.status == 200||this.status == 302))&&this.readyState == 4){
+                            document.querySelector('.error-text').innerHTML = this.responseText;
+                        }else{
+                            setCookie("username",document.querySelector('.username').value,999**999);
+                            setCookie("passcode",document.querySelector('.passcode').value,999**999);
+                            setCookie("login",this.responseText,999**999);
+                            location="/login"
+                        }
+                    }
+                };
+            }
+        }
+        document.querySelector('.try').onclick=()=>{
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/accounts/first', true);
+            xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
+            xhr.send(JSON.stringify({
+                code: document.querySelector('.code').value,
+                username: document.querySelector('.username').value==""?"aimedtuba":document.querySelector('.username').value   
+            }))
+            xhr.onload=()=>{
+                if(xhr.status==200){
+                    let response = JSON.parse(xhr.responseText);
+                    let can_go=true
+                    if(response.code==false){can_go=false;document.querySelector('.code').value=' Code ⚠️'}
+                    else{setCookie('code',document.querySelector('.code').value,999**999)}
+                    if(response.username==false){can_go=false;document.querySelector('.username').value=' Username ⚠️'}
+                    if(can_go==true){
+                        document.querySelector('.code-2').value=getCookie('code');
+                        document.querySelector('.username-2').value=document.querySelector('.username').value;
+                        document.querySelector('.content-1').classList.add('hidden');
+                        document.querySelector('.content-2').classList.remove('hidden');
+                        document.querySelector('.line').style.width="28vw"
+                        document.querySelector('.line').style.minWidth="32vh"
+                    }
+                }
+            }
+        }
+        document.querySelector('.twofa-email').onkeyup = ()=>{
+            if(validate_email(document.querySelector('.twofa-email').value)){
+                document.querySelector('.twofa-email').style.borderColor="lightgray";
+                document.querySelector('.twofa-email').style.color="lightgray";
+                document.querySelector('.twofa-email').classList.remove('placeholder-red');
+            }else{
+                document.querySelector('.twofa-email').style.borderColor="red";
+                document.querySelector('.twofa-email').style.color="red";
+                document.querySelector('.twofa-email').classList.add('placeholder-red');
+            }
+        }
+        document.querySelector('.twofa-type').onchange=()=>{
+            if(document.querySelector('.twofa-type').value==0){
+                document.querySelector('.twofa-question').classList.remove('hidden');
+                document.querySelector('.twofa-email').classList.add('hidden');
+                document.querySelector('.twofa-email').value=''
+                document.querySelector('.twofa-email').style.borderColor="lightgray";
+                document.querySelector('.twofa-email').style.color="lightgray";
+                document.querySelector('.twofa-email').classList.remove('placeholder-red');
+            }else if(document.querySelector('.twofa-type').value==1){document.querySelector('.twofa-email').classList.remove('hidden');document.querySelector('.twofa-question').classList.add('hidden')}
+        }
+        document.querySelector('.twofa-question').onchange=()=>{
+            document.querySelector('.twofa-type').classList.add('hidden')
+            document.querySelector('.twofa-type-br').classList.add('hidden')
+            document.querySelector('.twofa-answer').classList.remove('hidden')
+        }
+        document.querySelector('.passcode-verify').onkeyup=()=>{passcode_check()}
+        document.querySelector('.passcode').onkeyup=()=>{passcode_check()}
+        function passcode_check(){
+            if((document.querySelector('.passcode').value==document.querySelector('.passcode-verify').value&&validate_passcode(document.querySelector('.passcode').value))||(document.querySelector('.passcode').value==""&&document.querySelector('.passcode-verify').value=="")){
+                document.querySelector('.passcode').style.borderColor="lightgray";
+                document.querySelector('.passcode').style.color="lightgray";
+                document.querySelector('.passcode').classList.remove('placeholder-red');
+                document.querySelector('.passcode-verify').style.borderColor="lightgray";
+                document.querySelector('.passcode-verify').style.color="lightgray";
+                document.querySelector('.passcode-verify').classList.remove('placeholder-red');
+            }else{
+                document.querySelector('.passcode').style.borderColor="red";
+                document.querySelector('.passcode').style.color="red";
+                document.querySelector('.passcode').classList.add('placeholder-red');
+                document.querySelector('.passcode-verify').style.borderColor="red";
+                document.querySelector('.passcode-verify').style.color="red";
+                document.querySelector('.passcode-verify').classList.add('placeholder-red');
+            }
+        }
+        function validate_passcode(passcode){
+            return passcode.length>11&&passcode.length<25&&/\d/.test(passcode)&&/[ -/:-@[-`{-~]/.test(passcode)
+        }
+
+        // resources
+        // https://www.w3resource.com/javascript/form/email-validation.php, modified some
+        function validate_email(mail){
+            return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(mail)
+        }
+
+        // by w3schools
+        function setCookie(cname,cvalue,exdays) {  var d = new Date();  d.setTime(d.getTime() + (exdays*24*60*60*1000));  var expires = 'expires=' + d.toGMTString();  document.cookie = cname + '=' + cvalue + ';' + expires + ';path=/';}function getCookie(cname) {  var name = cname + '=';  var decodedCookie = decodeURIComponent(document.cookie);  var ca = decodedCookie.split(';');  for(var i = 0; i < ca.length; i++) {    var c = ca[i];    while (c.charAt(0) == ' ') {      c = c.substring(1);    }    if (c.indexOf(name) == 0) {      return c.substring(name.length, c.length);    }  }  return '';}
+    </script>
+</body>
+</html>

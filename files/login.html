@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>accounts.aimedtuba.com</title>
+    <style>
+        .main{
+            overflow:auto;
+            width:30vw;
+            min-width:40vh;
+            height:80vh;
+            border:2px solid lightgray;
+            border-radius: 15px;
+            top:50%;
+            left:50%;
+            position:absolute;
+            transform:translate(-50%,-50%);
+        }
+        .line{
+            width:14vw;
+            min-width:19vh;
+            height:1px;
+            border:1px solid transparent;
+            border-radius: 50px;
+            background-color:lightgray;
+        }
+        input, button, select,textarea{
+            outline: none; 
+            border:2px lightgray solid; 
+            border-radius:5px;
+            color:lightgray;
+            font-size: 15px;
+            background-color: white;
+            resize: none;
+        }
+        button{cursor: pointer;}
+        input{height: 20px;}
+        h3,a{font-family: 'Arial';}
+        input::placeholder,textarea::placeholder{color:lightgray;}
+        .code{height:72px;width:225px;}
+        *:disabled{cursor:not-allowed;}
+        .main div{margin-left:1vw;}
+        .hidden{display: none;}
+        .placeholder-red::placeholder{color:red;}
+
+    </style>
+</head>
+<body>
+    <div class="main">
+        <hr class="line">
+        <div class="content-main">
+            <textarea type="text" class="code" placeholder=" Code"></textarea><br>
+            <input type="text" class="username" placeholder=" Username"><br>
+            <input type="password" class="passcode" placeholder=" Passcode"><br><br>
+            <button class="get-twofa">Submit</button><br>
+        </div>
+        <div class="content-email hidden">
+            <h3>A code has been sent to <a class="twofa-email-question" style="border:2px solid lightgray;border-radius:5px">you@provider.email</a> it will expire in 10 minutes.</h3>
+            <input type="text" class="twofa-email-answer" placeholder=" Code"><br>
+            <button class="twofa-submit">Submit</button><br>
+        </div>
+        <div class="content-question hidden">
+            <h3 class="twofa-question-question">What is the answer to the question you selected?</h3>
+            <input type="text" class="twofa-question-answer" placeholder=" Answer"><br>
+            <button class="twofa-submit">Submit</button><br>
+        </div>
+    </div>
+    <script>
+        if(new URLSearchParams(location.search).get('code')){document.querySelector('.code').value = new URLSearchParams(location.search).get('code');}
+        else if(getCookie("code")){document.querySelector('.code').value = getCookie("code");}
+        if(getCookie("username")){document.querySelector('.username').value = getCookie("username");}
+        if(getCookie("passcode")){document.querySelector('.passcode').value = getCookie("passcode");}
+        document.querySelector('.get-twofa').onclick = ()=>{
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/accounts/first', true);
+            xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
+            xhr.send(JSON.stringify({
+                code: document.querySelector('.code').value,
+                username: document.querySelector('.username').value==""?"aimedtuba":document.querySelector('.username').value   
+            }))
+            xhr.onload=()=>{
+                if(xhr.status==200){
+                    let response = JSON.parse(xhr.responseText);
+                    let can_go=true
+                    if(response.code==false){can_go=false;document.querySelector('.code').value=' Code ⚠️'}
+                    else{setCookie('code',document.querySelector('.code').value,999**999)}
+                    if(response.username==true){can_go=false;document.querySelector('.username').value=' Username ⚠️'}
+                    if(can_go==true){
+                        xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/accounts/enter/first', true);
+                        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
+                        xhr.send(JSON.stringify({
+                            code: document.querySelector('.code').value,
+                            username: document.querySelector('.username').value==""?"aimedtuba":document.querySelector('.username').value,
+                            passcode: document.querySelector('.passcode').value
+                        }))
+                        xhr.onload=()=>{
+                            if(xhr.status==200){
+                                sessionStorage.setItem('response',xhr.responseText);
+                                let response = JSON.parse(sessionStorage.getItem('response'));
+                                console.log(response)
+                                document.querySelector('.content-main').classList.add('hidden');
+                                document.querySelector('.content-'+response.type).classList.remove('hidden');
+                                document.querySelector('.twofa-'+response.type+'-question').innerHTML = response.question;
+                                document.querySelector('.line').style.width="28vw"
+                                document.querySelector('.line').style.minWidth="32vh"
+                            }else{document.querySelector('.passcode').placeholder=' Passcode ⚠️';document.querySelector('.passcode').value='';}
+                        }
+                    }
+                }
+            }
+        }
+        document.querySelectorAll('.twofa-submit').forEach(e=>{
+            e.onclick=()=>{
+                let response = JSON.parse(sessionStorage.getItem('response'));
+                xhr = new XMLHttpRequest();
+                xhr.open('POST', '/accounts/enter/second', true);
+                xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8')
+                xhr.send(JSON.stringify({
+                    code: document.querySelector('.code').value,
+                    username: document.querySelector('.username').value==""?"aimedtuba":document.querySelector('.username').value,
+                    passcode: document.querySelector('.passcode').value,
+                    twofa: document.querySelector('.twofa-'+response.type+'-answer').value==""?"aimedtuba":document.querySelector('.twofa-'+response.type+'-answer').value
+                }))
+                xhr.onreadystatechange = ()=>{
+                    if(xhr.status==200&&xhr.readyState==4){
+                        setCookie('login',xhr.responseText,999**999);
+                        let redirect=new URLSearchParams(location.search).get('redirect')
+                        console.log(redirect)
+                        if(new URLSearchParams(location.search).get('redirect')){
+                            if(redirect.includes('?')){
+                                let _dummy=new URLSearchParams(redirect.split('?')[1]);
+                                _dummy.set("tuba-login",xhr.responseText)
+                                redirect=redirect.split('?')
+                                redirect[1]=_dummy
+                                redirect=redirect.join('?')
+                                location=redirect;
+                            }else{
+                                location=redirect+'?tuba-login='+xhr.responseText;
+                            }
+                        }else{location='https://aimedtuba.com/?tuba-login='+xhr.responseText;}
+                    }else if(xhr.readyState==4){document.querySelector('.twofa-'+response.type+'-answer').value=' ⚠️'}
+                }
+            }
+        })
+
+        // by w3schools
+        function setCookie(cname,cvalue,exdays) {  var d = new Date();  d.setTime(d.getTime() + (exdays*24*60*60*1000));  var expires = 'expires=' + d.toGMTString();  document.cookie = cname + '=' + cvalue + ';' + expires + ';path=/';}function getCookie(cname) {  var name = cname + '=';  var decodedCookie = decodeURIComponent(document.cookie);  var ca = decodedCookie.split(';');  for(var i = 0; i < ca.length; i++) {    var c = ca[i];    while (c.charAt(0) == ' ') {      c = c.substring(1);    }    if (c.indexOf(name) == 0) {      return c.substring(name.length, c.length);    }  }  return '';}
+    </script>
+</body>
+</html>
