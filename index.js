@@ -2,6 +2,7 @@ const { MongoClient } = require('mongodb');
 let client = new MongoClient(require('./apikeys').aimedtuba.accounts.mongodb_url);
 const express=require('express');
 const nodemailer=require('nodemailer');
+const path=require('path');
 const cors=require('cors');
 const app = express();
 const code=require('./apikeys').aimedtuba.accounts.code;
@@ -24,8 +25,8 @@ app.use(express.json());
 
 app.get('*', function(req, res){
     try{
-        if(req.path.includes(".")){res.sendFile("/users/27cadem/desktop/aimedtuba/accounts/files/"+req.path)}
-        else if(req.path!="/"){res.sendFile("/users/27cadem/desktop/aimedtuba/accounts/files/"+req.path+".html")}
+        if(req.path.includes(".")){path.join(__dirname,"files/"+req.path)}
+        else if(req.path!="/"){path.join(__dirname,"files/"+req.path+".html")}
         else{res.redirect(`/signup${req.query.code?"?code="+req.query.code:""}`)}
     }catch(e){res.status(404).send("Error 404")}
 })
