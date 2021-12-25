@@ -3,7 +3,7 @@ const nodemailer=require('nodemailer');
 const cors=require('cors');
 const fs=require('fs');
 const app = express();
-const code="w3TeRDEqKJXvow0Gs12mwywQlR8UJsMDz9C5YRgL6xSGjZ1ZPTW2yC57YdIDJr10t7LF26I4tQyT11z260is3KA7wX9Wn659SLcy"
+const code="_"
 const twofa=[
     "What is your dad's middle name?",
     "What is your grandmother's name?",
