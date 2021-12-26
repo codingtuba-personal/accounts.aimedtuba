@@ -1,9 +1,11 @@
+const { MongoClient } = require('mongodb');
+let client = new MongoClient(require('./apikeys').aimedtuba.accounts.mongodb_url);
 const express=require('express');
 const nodemailer=require('nodemailer');
+const path=require('path');
 const cors=require('cors');
-const fs=require('fs');
 const app = express();
-const code="_"
+const code=require('./apikeys').aimedtuba.accounts.code;
 const twofa=[
     "What is your dad's middle name?",
     "What is your grandmother's name?",
@@ -11,127 +13,149 @@ const twofa=[
     "What is the name of your first teacher?",
     "Where were you born?"
 ]
-let database={users:[]}
-fs.readFile('./database.json',(err,data)=>{
-    database=JSON.parse(data);
-})
-setInterval(()=>{
-    fs.writeFileSync('database.json',JSON.stringify(database))
-},1000)
+
+async function connect(){
+    await client.connect();
+    client=client.db("accounts").collection("users");
+    app.listen(9090)
+}
+connect()
 
 app.use(express.json());
 
-app.listen(9090)
-
 app.get('*', function(req, res){
     try{
-        if(req.path.includes(".")){res.sendFile("/users/27cadem/desktop/aimedtuba/accounts/files/"+req.path)}
-        else if(req.path!="/"){res.sendFile("/users/27cadem/desktop/aimedtuba/accounts/files/"+req.path+".html")}
+        if(req.path.includes(".")){path.join(__dirname,"files/"+req.path)}
+        else if(req.path!="/"){path.join(__dirname,"files/"+req.path+".html")}
         else{res.redirect(`/signup${req.query.code?"?code="+req.query.code:""}`)}
     }catch(e){res.status(404).send("Error 404")}
 })
-app.post('/accounts/first', (req, res)=>{
-    console.log(req.body)
-    if(req.body.code&&(!req.body.username)){
-        if(req.body.code==code){
-            res.send(true)
-        }else{res.send(false)}
-    }else if(req.body.code&&req.body.username){
-        res.send({code:req.body.code==code,username:!database.users.find(x=>x.username==req.body.username)});
-    }else{res.status(406).send("Not acceptable")}
-})
-app.post('/accounts/new/first', (req, res)=>{
-    if(req.body.code&&req.body.username&&req.body.passcode&&req.body.twofa){
-        if(validate_passcode(req.body.passcode)){
+app.post('/accounts/first', async function(req, res){
+    try{
+        console.log(req.body)
+        if(req.body.code&&(!req.body.username)){
             if(req.body.code==code){
-                if(validate_email(req.body.twofa)||(/^(0|1|2|3|4)$/.test(req.body.twofa)&&req.body.twofanswer)){
-                    if(!database.users.find(x=>x.username==req.body.username)){
-                        let _login=makeid(100);
-                        while(database.users.find(x=>x.login==_login)){_login=makeid(100)}
-                        database.users.push(
-                            {
-                                username:req.body.username,
-                                passcode:req.body.passcode,
-                                login:_login,
-                                twofa:{
-                                    type:req.body.twofa.includes(".") ? "email" : "question",
-                                    question:req.body.twofa.includes(".") ? req.body.twofa : twofa[parseInt(req.body.twofa)],
-                                    answer:req.body.twofanswer ? req.body.twofanswer : [],
-                                },
-                            }
-                        )
-                        res.send(_login)
-                    }else{res.status(409).send("Username taken")}
-                }else{res.status(401).send("Invalid 2FA")}
-            }else{res.status(401).send("Incorrect code")}
-        }else{res.status(406).send("Invalid passcode")}
-    }else{res.status(406).send("Not acceptable")}
+                res.send(true)
+            }else{res.send(false)}
+        }else if(req.body.code&&req.body.username){
+            let found=await client.find({username:req.body.username}).toArray()
+            res.send({code:req.body.code==code,username:!found.length==1});
+        }else{res.status(406).send("Not acceptable")}
+    }catch(e){console.log(e)}
 })
-app.post('/accounts/enter/first',(req,res)=>{
-    if(req.body.code&&req.body.username&&req.body.passcode){
-        if(req.body.code==code){
-            if(database.users.find(x=>x.username==req.body.username)){
-                if(database.users.find(x=>x.passcode==req.body.passcode&&x.username==req.body.username)){
-                    let _holder=echo_JSON(database.users.find(x=>x.username==req.body.username).twofa)
-                    _holder.answer=null;
-                    if(_holder.type=="email"){
-                        create_code(req.body.username)
-                        _holder=echo_JSON(database.users.find(x=>x.username==req.body.username).twofa)
-                        nodemailer.createTransport({
-                            host: 'aimedtuba.com',
-                            port: 465,
-                            secure: true,
-                            auth: {
-                                user: 'accounts@aimedtuba.com',
-                                pass: '*MHlJL.r{4As'
-                            }
-                        }).sendMail({
-                            from: '"Account Helper" <accounts@aimedtuba.com>',
-                            to: _holder.question,
-                            subject: "Your aimedtuba 2FA code",
-                            html: '<h1>Your 2FA code is:</h1><h2> '+_holder.answer[0]+'</h2>'
-                        })
+app.post('/accounts/new/first', async function(req, res){
+    try{
+        if(req.body.code&&req.body.username&&req.body.passcode&&req.body.twofa){
+            let found=await client.find({username:req.body.username}).toArray()
+            if(validate_passcode(req.body.passcode)){
+                if(req.body.code==code){
+                    if(validate_email(req.body.twofa)||(/^(0|1|2|3|4)$/.test(req.body.twofa)&&req.body.twofanswer)){
+                        if(!found.length==1){
+                            let _login=makeid(100);
+                            let found__login=await client.find({login:_login}).toArray()
+                            while(found__login.length==1){_login=makeid(100);found__login=await client.find({login:_login}).toArray()}
+                            await client.insertOne(
+                                {
+                                    username:req.body.username,
+                                    passcode:req.body.passcode,
+                                    login:_login,
+                                    twofa:{
+                                        type:req.body.twofa.includes(".") ? "email" : "question",
+                                        question:req.body.twofa.includes(".") ? req.body.twofa : twofa[parseInt(req.body.twofa)],
+                                        answer:req.body.twofanswer ? req.body.twofanswer : [],
+                                    },
+                                }
+                            )
+                            res.send(_login)
+                        }else{res.status(409).send("Username taken")}
+                    }else{res.status(401).send("Invalid 2FA")}
+                }else{res.status(401).send("Incorrect code")}
+            }else{res.status(406).send("Invalid passcode")}
+        }else{res.status(406).send("Not acceptable")}
+    }catch(e){console.log(e)}
+})
+app.post('/accounts/enter/first',async function(req,res){
+    try{
+        if(req.body.code&&req.body.username&&req.body.passcode){
+            let found1=await client.find({username:req.body.username}).toArray()
+            let found2=await client.find({username:req.body.username,passcode:req.body.passcode}).toArray()
+            if(req.body.code==code){
+                if(found1.length==1){
+                    if(found2.length==1){
+                        let _holder=echo_JSON(found1[0].twofa)
                         _holder.answer=null;
-                    }
-                    res.send(_holder)
-                }else{res.status(401).send("Incorrect passcode")}
-            }else{res.status(404).send("User not found")}
-        }else{res.status(401).send("Incorrect code")}
-    }else{res.status(406).send("Not acceptable")}
+                        if(_holder.type=="email"){
+                            await create_code(req.body.username)
+                            _holder=echo_JSON(found1[0].twofa)
+                            nodemailer.createTransport({
+                                host: 'aimedtuba.com',
+                                port: 465,
+                                secure: true,
+                                auth: {
+                                    user: 'accounts@aimedtuba.com',
+                                    pass: '*MHlJL.r{4As'
+                                }
+                            }).sendMail({
+                                from: '"Account Helper" <accounts@aimedtuba.com>',
+                                to: _holder.question,
+                                subject: "Your aimedtuba 2FA code",
+                                html: '<h1>Your 2FA code is:</h1><h2> '+_holder.answer[0]+'</h2>'
+                            })
+                            _holder.answer=null;
+                        }
+                        res.send(_holder)
+                    }else{res.status(401).send("Incorrect passcode")}
+                }else{res.status(404).send("User not found")}
+            }else{res.status(401).send("Incorrect code")}
+        }else{res.status(406).send("Not acceptable")}
+    }catch(e){console.log(e)}
 })
-app.post('/accounts/enter/second',(req,res)=>{
-    if(req.body.code&&req.body.username&&req.body.passcode&&req.body.twofa){
-        if(req.body.code==code){
-            if(database.users.find(x=>x.username==req.body.username)){
-                if(database.users.find(x=>x.passcode==req.body.passcode&&x.username==req.body.username)){
-                    let _holder=database.users.find(x=>x.username==req.body.username).twofa
-                    if(Array.isArray(_holder.answer)){
-                        if(_holder.answer.includes(req.body.twofa)){
-                            res.send(database.users.find(x=>x.username==req.body.username).login)
-                            _holder.answer=[];
-                        }else{res.status(401).send("Incorrect 2FA")}
-                    }else if(_holder.answer==req.body.twofa){
-                        res.send(database.users.find(x=>x.username==req.body.username).login)
-                    }else{res.send(401).send("Incorrect 2FA")}
-                }else{res.status(401).send("Incorrect passcode")}
-            }else{res.status(404).send("User not found")}
-        }else{res.status(401).send("Incorrect code")}
-    }else{res.status(406).send("Not acceptable")}
+app.post('/accounts/enter/second',async function(req,res){
+    try{
+        if(req.body.code&&req.body.username&&req.body.passcode&&req.body.twofa){
+            let found1=await client.find({username:req.body.username}).toArray()
+            let found2=await client.find({username:req.body.username,passcode:req.body.passcode}).toArray()
+            if(req.body.code==code){
+                if(found1.length==1){
+                    if(found2.length==1){
+                        let _holder=found1[0].twofa
+                        if(Array.isArray(_holder.answer)){
+                            if(_holder.answer.includes(req.body.twofa)){
+                                res.send(found1[0].login)
+                                await client.updateOne({username:req.body.username},{$set:{"twofa.answer":[]}})
+                            }else{res.status(401).send("Incorrect 2FA")}
+                        }else if(_holder.answer==req.body.twofa){
+                            res.send(found1[0].login)
+                        }else{res.send(401).send("Incorrect 2FA")}
+                    }else{res.status(401).send("Incorrect passcode")}
+                }else{res.status(404).send("User not found")}
+            }else{res.status(401).send("Incorrect code")}
+        }else{res.status(406).send("Not acceptable")}
+    }catch(e){console.log(e)}
 })
-app.post('/api/check',cors(),(req, res)=>{
-    res.json({data:database.users.find(x=>x.login==req.query.login)?true:false})
+app.post('/api/check',cors(),async (req, res)=>{
+    let found1=await client.find({login:req.query.login}).toArray()
+    res.json({data:found1.length==1})
 })
-function create_code(username){
+async function create_code(username){
     let _code="";
     for(let i=0;i<6;i++){
         _code+=Math.floor(Math.random()*10);
     }
-    console.log(username)
-    console.log(database.users.find(x=>x.username==username))
-    database.users.find(x=>x.username==username).twofa.answer.splice(0, 0, _code)
-    setTimeout(()=>{
-        database.users.find(x=>x.username==username).twofa.answer.splice(0, 1)
+    let found=await client.find({username:username}).toArray()
+    let answers=found[0].twofa.answer
+    answers.splice(0,0,_code)
+    await client.updateOne({username:username},{$set:{"twofa.answer":answers}})
+    timeout(async ()=>{
+        let found=await client.find({username:username}).toArray()
+        let answers=found[0].twofa.answer
+        answers.splice(0,1)
+        await client.updateOne({username:username},{$set:{"twofa.answer":answers}})
     },600000)
+    return;
+}
+function timeout(to_do,time){
+    setTimeout(to_do,time)
 }
 
 // https://stackoverflow.com/a/1349426
