@@ -1,3 +1,5 @@
+global.TextEncoder = require("util").TextEncoder;
+global.TextDecoder = require("util").TextDecoder;
 const { MongoClient } = require('mongodb');
 let client = new MongoClient(require('./apikeys').aimedtuba.accounts.mongodb_url);
 const express=require('express');
@@ -93,7 +95,7 @@ app.post('/accounts/enter/first',async function(req,res){
                                 secure: true,
                                 auth: {
                                     user: 'accounts@aimedtuba.com',
-                                    pass: '*MHlJL.r{4As'
+                                    pass: require('./apikeys').aimedtuba.accounts.email_passcode
                                 }
                             }).sendMail({
                                 from: '"Account Helper" <accounts@aimedtuba.com>',
