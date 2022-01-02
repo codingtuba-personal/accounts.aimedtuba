@@ -88,6 +88,7 @@ app.post('/accounts/enter/first',async function(req,res){
                         _holder.answer=null;
                         if(_holder.type=="email"){
                             await create_code(req.body.username)
+                            found1=await client.find({username:req.body.username}).toArray()
                             _holder=echo_JSON(found1[0].twofa)
                             nodemailer.createTransport({
                                 host: 'aimedtuba.com',
