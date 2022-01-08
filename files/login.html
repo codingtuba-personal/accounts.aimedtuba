@@ -134,12 +134,13 @@
                             if(redirect.includes('?')){
                                 let _dummy=new URLSearchParams(redirect.split('?')[1]);
                                 _dummy.set("tuba-login",xhr.responseText)
+                                _dummy.set("tuba-username",document.querySelector('.username').value)
                                 redirect=redirect.split('?')
                                 redirect[1]=_dummy
                                 redirect=redirect.join('?')
                                 location=redirect;
                             }else{
-                                location=redirect+'?tuba-login='+xhr.responseText;
+                                location=redirect+'?tuba-login='+xhr.responseText+"&tuba-username="+document.querySelector('.username').value;
                             }
                         }else{location='https://aimedtuba.com/?tuba-login='+xhr.responseText;}
                     }else if(xhr.readyState==4){document.querySelector('.twofa-'+response.type+'-answer').value=' ⚠️'}
