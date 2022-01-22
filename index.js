@@ -92,7 +92,7 @@ app.post('/accounts/enter/first',async function(req,res){
                             _holder=echo_JSON(found1[0].twofa)
                             nodemailer.createTransport({
                                 host: 'aimedtuba.com',
-                                port: 465,
+                                port: 587,
                                 secure: true,
                                 auth: {
                                     user: 'accounts@aimedtuba.com',
