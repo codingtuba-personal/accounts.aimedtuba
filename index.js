@@ -91,7 +91,7 @@ app.post('/accounts/enter/first',async function(req,res){
                             found1=await client.find({username:req.body.username}).toArray()
                             _holder=echo_JSON(found1[0].twofa)
                             nodemailer.createTransport({
-                                host: 'aimedtuba.com',
+                                host: 'server306.web-hosting.com',
                                 port: 587,
                                 secure: false,
                                 auth: {
