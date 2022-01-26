@@ -73,6 +73,7 @@
         else if(getCookie("code")){document.querySelector('.code').value = getCookie("code");}
         if(getCookie("username")){document.querySelector('.username').value = getCookie("username");}
         if(getCookie("passcode")){document.querySelector('.passcode').value = getCookie("passcode");}
+        let email=false
         document.querySelector('.get-twofa').onclick = ()=>{
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/accounts/first', true);
@@ -101,7 +102,7 @@
                             if(xhr.status==200){
                                 sessionStorage.setItem('response',xhr.responseText);
                                 let response = JSON.parse(sessionStorage.getItem('response'));
-                                console.log(response)
+                                email=response.type=="email"?response.question:null
                                 document.querySelector('.content-main').classList.add('hidden');
                                 document.querySelector('.content-'+response.type).classList.remove('hidden');
                                 document.querySelector('.twofa-'+response.type+'-question').innerHTML = response.question;
@@ -131,16 +132,29 @@
                         let redirect=new URLSearchParams(location.search).get('redirect')
                         console.log(redirect)
                         if(new URLSearchParams(location.search).get('redirect')){
-                            if(redirect.includes('?')){
-                                let _dummy=new URLSearchParams(redirect.split('?')[1]);
-                                _dummy.set("tuba-login",xhr.responseText)
-                                _dummy.set("tuba-username",document.querySelector('.username').value)
-                                redirect=redirect.split('?')
-                                redirect[1]=_dummy
-                                redirect=redirect.join('?')
-                                location=redirect;
+                            if(redirect.startsWith("v2:")){
+                                let v2_=new URLSearchParams()
+                                redirect=redirect.split("?")[0]
+                                if(_v2.get("params")){
+                                    _v2.get("params").split(",").forEach(i=>{
+                                        let __dummy=""
+                                        if(_v2.get("$"+i)) __dummy=_v2.get("$"+i)
+                                        _v2.set(i,__dummy)
+                                    })
+                                }
+                                location.replace(redirect+"?"+v2_)
                             }else{
-                                location=redirect+'?tuba-login='+xhr.responseText+"&tuba-username="+document.querySelector('.username').value;
+                                if(redirect.includes('?')){
+                                    let _dummy=new URLSearchParams(redirect.split('?')[1]);
+                                    _dummy.set("tuba-login",xhr.responseText)
+                                    _dummy.set("tuba-username",document.querySelector('.username').value)
+                                    redirect=redirect.split('?')
+                                    redirect[1]=_dummy
+                                    redirect=redirect.join('?')
+                                    location=redirect;
+                                }else{
+                                    location=redirect+'?tuba-login='+xhr.responseText+"&tuba-username="+document.querySelector('.username').value;
+                                }
                             }
                         }else{location='https://aimedtuba.com/?tuba-login='+xhr.responseText;}
                     }else if(xhr.readyState==4){document.querySelector('.twofa-'+response.type+'-answer').value=' ⚠️'}
